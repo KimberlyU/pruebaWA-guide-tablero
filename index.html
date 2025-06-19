@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VentureGuide - Tablero de Retos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .track-persona { background: linear-gradient(135deg, #8B5CF6, #EC4899); }
+        .track-proyecto { background: linear-gradient(135deg, #3B82F6, #06B6D4); }
+        .track-comunidad { background: linear-gradient(135deg, #10B981, #059669); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="max-w-md mx-auto bg-gray-50 min-h-screen">
+        <!-- App será renderizada aquí -->
+    </div>
+
+    <script>
+        // Estado de la aplicación
+        let state = {
+            selectedTrack: 0,
+            completedChallenges: JSON.parse(localStorage.getItem('ventureGuideProgress') || '[]'),
+            selectedCard: null
+        };
+
+        // Configuración de tracks
+        const tracks = [
+            {
+                id: 0,
+                name: "Persona",
+                icon: "👤",
+                color: "track-persona",
+                description: "Desarrollo personal y autoconocimiento emprendedor",
+                borderColor: "border-purple-300"
+            },
+            {
+                id: 1,
+                name: "Proyecto",
+                icon: "💼",
+                color: "track-proyecto",
+                description: "Desarrollo de tu idea de negocio",
+                borderColor: "border-blue-300"
+            },
+            {
+                id: 2,
+                name: "Comunidad",
+                icon: "👥",
+                color: "track-comunidad",
+                description: "Networking y construcción de redes",
+                borderColor: "border-green-300"
+            }
+        ];
+
+        // Configuración de niveles
+        const levels = [
+            { id: 1, name: "Nivel 1", time: "1-2 horas", points: 1, color: "bg-yellow-400", textColor: "text-yellow-800" },
+            { id: 2, name: "Nivel 2", time: "2-3 horas", points: 2, color: "bg-orange-400", textColor: "text-orange-800" },
+            { id: 3, name: "Nivel 3", time: "3+ horas", points: 4, color: "bg-red-400", textColor: "text-red-800" }
+        ];
+
+        // Generar tarjetas
+        function generateCards(trackId, levelId) {
+            return Array.from({ length: 4 }, (_, index) => ({
+                id: `${trackId}-${levelId}-${index}`,
+                trackId,
+                levelId,
+                title: `Reto ${index + 1}`,
+                description: "Descripción del reto pendiente de definir",
+                completed: state.completedChallenges.includes(`${trackId}-${levelId}-${index}`)
+            }));
+        }
+
+        // Funciones de utilidad
+        function saveProgress() {
+            localStorage.setItem('ventureGuideProgress', JSON.stringify(state.completedChallenges));
+        }
+
+        function exportProgress() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                completedChallenges: state.completedChallenges,
+                totalPoints: getTotalPoints(),
+                progressByTrack: tracks.map(track => ({
+                    trackName: track.name,
+                    completed: getCompletedByTrack(track.id)
+                }))
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `venture-guide-progreso-${new Date().toLocaleDateString()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function toggleCardCompletion(cardId) {
+            if (state.completedChallenges.includes(cardId)) {
+                state.completedChallenges = state.completedChallenges.filter(id => id !== cardId);
+            } else {
+                state.completedChallenges = [...state.completedChallenges, cardId];
+            }
+            saveProgress();
+            render();
+        }
+
+        function getTotalPoints() {
+            return state.completedChallenges.reduce((total, cardId) => {
+                const [trackId, levelId] = cardId.split('-');
+                const level = levels.find(l => l.id === parseInt(levelId));
+                return total + (level ? level.points : 0);
+            }, 0);
+        }
+
+        function getCompletedByTrack(trackId) {
+            return state.completedChallenges.filter(id => id.startsWith(`${trackId}-`)).length;
+        }
+
+        // Función de renderizado
+        function render() {
+            const currentTrack = tracks[state.selectedTrack];
+            
+            document.getElementById('app').innerHTML = `
+                <!-- Header -->
+                <div class="${currentTrack.color} text-white p-6 rounded-b-3xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h1 class="text-2xl font-bold">VentureGuide</h1>
+                            <p class="text-sm opacity-90">Tablero de Retos</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="bg-white bg-opacity-20 rounded-full px-3 py-1">
+                                <span class="text-sm font-bold">${getTotalPoints()} pts</span>
+                            </div>
+                            <p class="text-xs mt-1 opacity-75">Total ganados</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <button onclick="changeTrack(-1)" class="bg-white bg-opacity-20 rounded-full p-2 hover:bg-opacity-30 transition-colors">
+                            ◀
+                        </button>
+                        
+                        <div class="text-center flex-1">
+                            <div class="flex items-center justify-center gap-2 mb-2">
+                                <span class="text-2xl">${currentTrack.icon}</span>
+                                <h2 class="text-xl font-bold">${currentTrack.name}</h2>
+                            </div>
+                            <p class="text-xs opacity-90">${currentTrack.description}</p>
+                            <div class="mt-2 bg-white bg-opacity-20 rounded-full px-3 py-1 inline-block">
+                                <span class="text-sm">${getCompletedByTrack(currentTrack.id)}/12 completados</span>
+                            </div>
+                        </div>
+                        
+                        <button onclick="changeTrack(1)" class="bg-white bg-opacity-20 rounded-full p-2 hover:bg-opacity-30 transition-colors">
+                            ▶
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Track Tabs -->
+                <div class="flex bg-white mx-4 -mt-4 rounded-xl shadow-sm border border-gray-200 relative z-10">
+                    ${tracks.map((track, index) => `
+                        <button onclick="setTrack(${index})" class="flex-1 p-3 text-center rounded-xl transition-colors ${
+                            state.selectedTrack === index 
+                                ? `${track.color} text-white` 
+                                : 'text-gray-600 hover:bg-gray-50'
+                        }">
+                            <div class="text-xl mb-1">${track.icon}</div>
+                            <span class="text-xs font-medium">${track.name}</span>
+                        </button>
+                    `).join('')}
+                </div>
+
+                <!-- Challenge Cards by Level -->
+                <div class="p-4 space-y-6">
+                    ${levels.map(level => `
+                        <div class="bg-white rounded-2xl p-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="${level.color} w-3 h-3 rounded-full"></div>
+                                    <h3 class="font-bold text-gray-800">${level.name}</h3>
+                                    <span class="text-xs text-gray-500">(${level.time})</span>
+                                </div>
+                                <div class="${level.color} ${level.textColor} px-2 py-1 rounded-full text-xs font-bold">
+                                    ${level.points} pts c/u
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                ${generateCards(currentTrack.id, level.id).map(card => `
+                                    <div onclick="openCard('${card.id}')" 
+                                         class="bg-white rounded-xl border-2 ${card.completed ? 'border-green-300 bg-green-50' : 'border-gray-200'} p-4 cursor-pointer transition-all duration-200 hover:shadow-md ${card.completed ? 'opacity-90' : ''}">
+                                        <div class="flex items-start justify-between mb-2">
+                                            <div class="flex-1">
+                                                <h4 class="font-semibold text-sm ${card.completed ? 'text-green-800' : 'text-gray-800'}">
+                                                    ${card.title}
+                                                </h4>
+                                                <p class="text-xs mt-1 ${card.completed ? 'text-green-600' : 'text-gray-600'}">
+                                                    ${card.description}
+                                                </p>
+                                            </div>
+                                            ${card.completed ? '<div class="bg-green-500 text-white rounded-full p-1 text-xs">★</div>' : ''}
+                                        </div>
+                                        
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-xs text-gray-500">⏱ ${level.time}</span>
+                                            </div>
+                                            <div class="${level.color} ${level.textColor} px-2 py-1 rounded-full text-xs font-bold">
+                                                ${level.points} pts
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Export Button -->
+                <div class="mx-4 mb-6">
+                    <button onclick="exportProgress()" class="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-xl font-semibold hover:from-green-600 hover:to-emerald-600 transition-colors">
+                        📥 Exportar Mi Progreso
+                    </button>
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="mx-4 mb-6 bg-white rounded-2xl p-4">
+                    <h3 class="font-bold mb-3 flex items-center gap-2">
+                        🏆 Resumen de Progreso
+                    </h3>
+                    <div class="grid grid-cols-3 gap-4">
+                        ${tracks.map(track => `
+                            <div class="text-center">
+                                <div class="${track.color} w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 text-white text-lg">
+                                    ${track.icon}
+                                </div>
+                                <p class="text-xs font-semibold text-gray-800">${track.name}</p>
+                                <p class="text-xs text-gray-600">${getCompletedByTrack(track.id)}/12</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                ${state.selectedCard ? renderModal() : ''}
+            `;
+        }
+
+        function renderModal() {
+            const cardData = state.selectedCard.split('-');
+            const level = levels.find(l => l.id === parseInt(cardData[1]));
+            const completed = state.completedChallenges.includes(state.selectedCard);
+            
+            return `
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div class="bg-white rounded-2xl p-6 max-w-sm w-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold">Reto ${parseInt(cardData[2]) + 1}</h3>
+                                <p class="text-sm text-gray-600 mt-1">Descripción del reto pendiente de definir</p>
+                            </div>
+                            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 text-xl">
+                                ✕
+                            </button>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded-lg p-3 mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium">Duración estimada:</span>
+                                <span class="text-sm text-gray-600">${level.time}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium">Puntos:</span>
+                                <span class="${level.color} ${level.textColor} px-2 py-1 rounded-full text-xs font-bold">
+                                    ${level.points} puntos
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <button onclick="toggleCardCompletion('${state.selectedCard}'); closeModal();" 
+                                    class="w-full py-3 rounded-xl font-semibold transition-colors ${
+                                        completed 
+                                            ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' 
+                                            : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-600 hover:to-emerald-600'
+                                    }">
+                                ${completed ? 'Marcar como Pendiente' : 'Completar Reto'}
+                            </button>
+                            
+                            <button onclick="closeModal()" class="w-full bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-colors">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Event handlers
+        function changeTrack(direction) {
+            state.selectedTrack = (state.selectedTrack + direction + tracks.length) % tracks.length;
+            render();
+        }
+
+        function setTrack(index) {
+            state.selectedTrack = index;
+            render();
+        }
+
+        function openCard(cardId) {
+            state.selectedCard = cardId;
+            render();
+        }
+
+        function closeModal() {
+            state.selectedCard = null;
+            render();
+        }
+
+        // Inicializar la aplicación
+        render();
+    </script>
+</body>
+</html>
